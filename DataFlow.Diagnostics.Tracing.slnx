@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="DataFlow.Diagnostics.Tracing.IntegrationTests/DataFlow.Diagnostics.Tracing.IntegrationTests.csproj" />
+  <Project Path="DataFlow.Diagnostics.Tracing.Tests/DataFlow.Diagnostics.Tracing.Tests.csproj" />
+  <Project Path="DataFlow.Diagnostics.Tracing/DataFlow.Diagnostics.Tracing.csproj" />
+</Solution>
