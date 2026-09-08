@@ -101,6 +101,18 @@ Console.WriteLine(document?.TraceDocumentJson);
 | `QueryChannelTraceRangeAsync` / `QueryPipelineTraceRangeAsync` | 按时间范围分页查询索引条目 |
 | `QueryChannelTraceDocumentAsync` / `QueryPipelineTraceDocumentAsync` | 查询单条 Trace 完整 JSON 文档 |
 | `QueryTraceAsync(documentKey)` | 按文档 Key 直接查询 JSON 内容 |
+| `RemoveExpiredTraceIndexMembersAsync(server, retentionMilliseconds?)` | SCAN 所有索引键，Batch 批量移除 score 早于保留期阈值的过期 member（返回移除总数） |
+
+### 清理过期索引
+
+持续写入会使索引键随写入滑动续期，导致 SortedSet 中残留指向已过期文档的 member。可通过定时任务调用清理方法（需传入 `IServer` 用于 SCAN 扫描）：
+
+```csharp
+var server = multiplexer.GetServer(multiplexer.GetEndPoints()[0]);
+
+// retentionMilliseconds 为 null 时使用默认保留期（2 小时）
+long removed = await traceService.RemoveExpiredTraceIndexMembersAsync(server);
+```
 
 ### TraceService 构造参数
 

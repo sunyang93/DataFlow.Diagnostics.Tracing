@@ -332,6 +332,55 @@ namespace DataFlow.Diagnostics.Tracing
             return result.IsNull ? null : result.ToString();
         }
 
+        /// <inheritdoc />
+        public async Task<long> RemoveExpiredTraceIndexMembersAsync(IServer server, long? retentionMilliseconds = null)
+        {
+            if (server == null) throw new ArgumentNullException(nameof(server));
+            var retention = retentionMilliseconds ?? TraceDefinitions.DefaultRetentionTime;
+            if (retention <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(retentionMilliseconds), "RetentionTimeMilliseconds 必须大于 0。");
+            }
+
+            // 过期阈值（Unix 毫秒）：score（写入时间戳）早于 now - retention 的 member 视为已过期
+            var cutoffMs = _timeProvider.GetUtcNow().ToUnixTimeMilliseconds() - retention;
+
+            // SCAN 扫描所有时间索引 key：trace:{traceObject}:{objectId}:index
+            var indexKeys = new List<RedisKey>();
+            await foreach (var key in server.KeysAsync(_database.Database, TraceDefinitions.IndexKeyPattern).ConfigureAwait(false))
+            {
+                indexKeys.Add(key);
+            }
+
+            if (indexKeys.Count == 0)
+            {
+                return 0;
+            }
+
+            // 按 batchSize 分批，每批使用 Redis Batch（管道）打包发送 ZREMRANGEBYSCORE
+            long totalRemoved = 0;
+            for (int start = 0; start < indexKeys.Count; start += _batchSize)
+            {
+                var count = Math.Min(_batchSize, indexKeys.Count - start);
+                var batch = _database.CreateBatch();
+                var tasks = new Task<long>[count];
+                for (int i = 0; i < count; i++)
+                {
+                    var indexKey = indexKeys[start + i];
+                    // Exclude.Stop：严格移除 score < cutoffMs 的 member（等于阈值的保留）
+                    tasks[i] = batch.SortedSetRemoveRangeByScoreAsync(
+                        indexKey, double.NegativeInfinity, cutoffMs, Exclude.Stop);
+                }
+                batch.Execute();
+                var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+                foreach (var removed in results)
+                {
+                    totalRemoved += removed;
+                }
+            }
+            return totalRemoved;
+        }
+
         /// <summary>
         /// 校验文档查询参数。
         /// </summary>

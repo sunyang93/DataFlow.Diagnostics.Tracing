@@ -1,3 +1,4 @@
+using StackExchange.Redis;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -93,5 +94,18 @@ namespace DataFlow.Diagnostics.Tracing
         /// <returns>JSON 字符串，未找到时返回 null。</returns>
         /// <exception cref="System.ArgumentException">当 documentKey 为空时抛出。</exception>
         Task<string?> QueryTraceAsync(string documentKey);
+
+        /// <summary>
+        /// 清理所有时间索引 SortedSet 中已过期的 member。
+        /// 通过 SCAN 扫描全部 trace:*:index 索引键，再使用 Batch（管道）批量执行 ZREMRANGEBYSCORE，
+        /// 仅移除 score（写入时间戳）早于“当前时间 - 保留期”的 member；JSON 文档本身由 TTL 自动过期，本方法不删除文档。
+        /// 适用于定时维护任务：在持续写入导致索引键滑动续期时，清除指向已过期文档的残留 member。
+        /// </summary>
+        /// <param name="server">Redis 服务端实例，用于 SCAN 扫描索引键（可由 ConnectionMultiplexer.GetServer 获取）。</param>
+        /// <param name="retentionMilliseconds">保留期（毫秒），为 null 时使用默认值 2 小时；score 早于 now-retention 的 member 会被移除。</param>
+        /// <returns>所有索引键中被移除的 member 总数。</returns>
+        /// <exception cref="System.ArgumentNullException">当 server 为 null 时抛出。</exception>
+        /// <exception cref="System.ArgumentOutOfRangeException">当 retentionMilliseconds 小于等于 0 时抛出。</exception>
+        Task<long> RemoveExpiredTraceIndexMembersAsync(IServer server, long? retentionMilliseconds = null);
     }
 }

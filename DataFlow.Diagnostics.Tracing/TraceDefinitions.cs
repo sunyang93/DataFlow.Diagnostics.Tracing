@@ -50,6 +50,12 @@ namespace DataFlow.Diagnostics.Tracing
         }
 
         /// <summary>
+        /// 匹配所有 Trace 时间索引（SortedSet）Key 的通配符模式，供 SCAN 扫描使用。
+        /// 覆盖 channel / pipeline 两种对象类型，例如：trace:channel:ch-1:index、trace:pipeline:p-1:index。
+        /// </summary>
+        public const string IndexKeyPattern = "trace:*:index";
+
+        /// <summary>
         /// 构造 Trace 时间索引（SortedSet）的 Redis Key。
         /// 格式：trace:{traceObject}:{objectId}:index
         /// 示例：trace:channel:channel-1:index
